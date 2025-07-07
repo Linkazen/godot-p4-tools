@@ -23,10 +23,14 @@ func _get_p4_info():
 	var exit_code = OS.execute("p4", ["info"], output, true)
 	
 	if exit_code == 0:
-		for line in output:
-			if line.begins_with("Client root:"):
-				workspace_root = line.split(":")[1].strip_edges()
-				break
+		for output_chunk in output:
+			var lines = output_chunk.split("\n")
+			for line in lines:
+				if line.begins_with("Client root:"):
+					var colon_pos = line.find(":")
+					if colon_pos != -1:
+						workspace_root = line.substr(colon_pos + 1).strip_edges()
+						break
 
 func is_file_checked_out(file_path: String) -> bool:
 	return file_path in checked_out_files
@@ -201,48 +205,318 @@ func get_checked_out_files() -> Array:
 func get_workspace_root() -> String:
 	return workspace_root
 
+func get_client_name() -> String:
+	var output = []
+	var exit_code = OS.execute("p4", ["info"], output, true)
+	
+	if exit_code == 0:
+		for output_chunk in output:
+			var lines = output_chunk.split("\n")
+			for line in lines:
+				if line.begins_with("Client name:"):
+					return line.split(":")[1].strip_edges()
+	return ""
+
 func get_godot_changelist_number() -> String:
 	return godot_changelist_number
 
+func get_all_changelists() -> Array:
+	var user = _get_p4_user()
+	var output = []
+	var exit_code = -1
+	
+	# Try with user filter if we have a username, using JSON output
+	if user != "":
+		exit_code = OS.execute("p4", ["-ztag", "-Mj", "changes", "-s", "pending", "-u", user], output, true)
+	
+	# If user filter failed or no username, try without user filter
+	if exit_code != 0:
+		output.clear()
+		exit_code = OS.execute("p4", ["-ztag", "-Mj", "changes", "-s", "pending"], output, true)
+	
+	var changelists = []
+	if exit_code == 0 and output.size() > 0:
+		# Parse JSON Lines output (each line is a separate JSON object)
+		var json_text = ""
+		for chunk in output:
+			json_text += chunk
+		
+		var lines = json_text.split("\n")
+		var json = JSON.new()
+		
+		for line in lines:
+			line = line.strip_edges()
+			if line == "":
+				continue
+				
+			var parse_result = json.parse(line)
+			
+			if parse_result == OK:
+				var change_data = json.data
+				
+				if change_data.has("change") and change_data.has("desc") and change_data.has("status"):
+					# Only include pending changelists
+					if change_data["status"] == "pending":
+						var cl_number = str(change_data["change"])
+						var description = change_data["desc"].strip_edges()
+						
+						changelists.append({
+							"number": cl_number,
+							"description": description
+						})
+			else:
+				# If any line fails, fall back to text parsing for the whole output
+				changelists.clear()
+				_parse_text_output(output, changelists)
+				break
+	
+	return changelists
+
+func _parse_text_output(output: Array, changelists: Array):
+	for output_chunk in output:
+		var lines = output_chunk.split("\n")
+		for line in lines:
+			line = line.strip_edges()
+			if line == "":
+				continue
+			var parts = line.split(" ")
+			if parts.size() >= 2 and parts[0] == "Change":
+				var cl_number = parts[1]
+				var description = ""
+				var desc_start = line.find("'")
+				if desc_start != -1:
+					var desc_end = line.rfind("'")
+					if desc_end > desc_start:
+						description = line.substr(desc_start + 1, desc_end - desc_start - 1)
+				
+				changelists.append({
+					"number": cl_number,
+					"description": description
+				})
+
+func get_changelist_files(cl_number: String) -> Array:
+	var output = []
+	var exit_code = OS.execute("p4", ["-ztag", "-Mj", "describe", "-s", cl_number], output, true)
+	
+	var files = []
+	if exit_code == 0 and output.size() > 0:
+		# Parse JSON Lines output
+		var json_text = ""
+		for chunk in output:
+			json_text += chunk
+		
+		var lines = json_text.split("\n")
+		var json = JSON.new()
+		
+		for line in lines:
+			line = line.strip_edges()
+			if line == "":
+				continue
+				
+			var parse_result = json.parse(line)
+			if parse_result == OK:
+				var data = json.data
+				
+				# Look for file entries (depotFile0, depotFile1, etc.)
+				var file_index = 0
+				while data.has("depotFile" + str(file_index)):
+					var depot_path = data["depotFile" + str(file_index)]
+					var action = data.get("action" + str(file_index), "edit")
+					
+					# Convert depot path to local path
+					var local_path = _depot_to_local_path(depot_path)
+					if local_path != "":
+						files.append({
+							"path": local_path,
+							"action": action
+						})
+					
+					file_index += 1
+	
+	return files
+
+func _get_p4_user() -> String:
+	var output = []
+	var exit_code = OS.execute("p4", ["user", "-o"], output, true)
+	
+	if exit_code != 0:
+		return ""
+	
+	for output_chunk in output:
+		var lines = output_chunk.split("\n")
+		for line in lines:
+			if line.begins_with("User:"):
+				var parts = line.split(":")
+				if parts.size() >= 2:
+					return parts[1].strip_edges()
+	
+	return ""
+
+func _depot_to_local_path(depot_path: String) -> String:
+	# Remove version info (e.g., #1, #2, etc.)
+	var clean_path = depot_path
+	var hash_pos = clean_path.rfind("#")
+	if hash_pos != -1:
+		clean_path = clean_path.substr(0, hash_pos)
+	
+	# Query P4 to get the local path
+	var output = []
+	var exit_code = OS.execute("p4", ["where", clean_path], output, true)
+	
+	if exit_code == 0 and output.size() > 0:
+		var where_line = output[0]
+		
+		# P4 where output format: "depot_path client_path local_path"
+		var parts = where_line.split(" ")
+		
+		if parts.size() >= 3:
+			var local_path = parts[2].strip_edges()
+			
+			# Normalize paths to use forward slashes
+			local_path = local_path.replace("\\", "/")
+			var normalized_workspace = workspace_root.replace("\\", "/")
+			
+			# Convert to Godot resource path
+			if local_path.begins_with(normalized_workspace):
+				var relative_path = local_path.substr(normalized_workspace.length())
+				if relative_path.begins_with("/"):
+					relative_path = relative_path.substr(1)
+				return "res://" + relative_path
+	
+	return ""
+
+func convert_depot_paths_batch(depot_paths: Array) -> Dictionary:
+	# Convert multiple depot paths at once to reduce P4 calls
+	var result = {}
+	
+	if depot_paths.is_empty():
+		return result
+	
+	# Clean depot paths (remove version info)
+	var clean_paths = []
+	for depot_path in depot_paths:
+		var clean_path = depot_path
+		var hash_pos = clean_path.rfind("#")
+		if hash_pos != -1:
+			clean_path = clean_path.substr(0, hash_pos)
+		clean_paths.append(clean_path)
+	
+	# Build P4 where command with multiple paths
+	var cmd_args = ["where"] + clean_paths
+	var output = []
+	var exit_code = OS.execute("p4", cmd_args, output, true)
+	
+	if exit_code == 0 and output.size() > 0:
+		# Parse the output - each line corresponds to a depot path
+		var output_text = ""
+		for chunk in output:
+			output_text += chunk
+		
+		var lines = output_text.split("\n")
+		var line_index = 0
+		
+		for i in range(depot_paths.size()):
+			if line_index < lines.size():
+				var line = lines[line_index].strip_edges()
+				line_index += 1
+				
+				if line != "":
+					# Parse line format: "depot_path client_path local_path"
+					var parts = line.split(" ")
+					
+					if parts.size() >= 3:
+						var local_path = parts[2].strip_edges()
+						
+						# Normalize paths to use forward slashes
+						local_path = local_path.replace("\\", "/")
+						var normalized_workspace = workspace_root.replace("\\", "/")
+						
+						# Convert to Godot resource path
+						if local_path.begins_with(normalized_workspace):
+							var relative_path = local_path.substr(normalized_workspace.length())
+							if relative_path.begins_with("/"):
+								relative_path = relative_path.substr(1)
+							result[depot_paths[i]] = "res://" + relative_path
+	
+	return result
+
 func _ensure_godot_changelist():
+	print("P4Client: Ensuring Godot changelist...")
+	print("P4Client: Current godot_changelist_number: ", godot_changelist_number)
+	
 	# Check if our current changelist is still valid
 	if godot_changelist_number != "" and _is_changelist_valid(godot_changelist_number):
+		print("P4Client: Current changelist is still valid: ", godot_changelist_number)
 		return
 	
 	# Check if we already have a Godot changelist
 	var existing_changelist = _find_godot_changelist()
 	if existing_changelist != "":
+		print("P4Client: Found existing Godot changelist: ", existing_changelist)
 		godot_changelist_number = existing_changelist
 		return
 	
 	# Create a new changelist for Godot
+	print("P4Client: Creating new Godot changelist...")
 	godot_changelist_number = _create_changelist(GODOT_CHANGELIST_DESCRIPTION)
+	print("P4Client: Created new changelist: ", godot_changelist_number)
 
 func _find_godot_changelist() -> String:
+	print("P4Client: Looking for existing Godot changelist...")
 	# Look for existing changelist with our description
 	var output = []
-	var exit_code = OS.execute("p4", ["changes", "-s", "pending", "-u", _get_current_user()], output, true)
+	var exit_code = -1
 	
+	var user = _get_p4_user()
+	
+	# Try with user filter if we have a username
+	if user != "":
+		exit_code = OS.execute("p4", ["-ztag", "-Mj", "changes", "-s", "pending", "-u", user], output, true)
+		print("P4Client: _find_godot_changelist with user filter exit code: ", exit_code)
+	
+	# If user filter failed or no username, try without user filter
+	if exit_code != 0:
+		print("P4Client: _find_godot_changelist trying without user filter...")
+		output.clear()
+		exit_code = OS.execute("p4", ["-ztag", "-Mj", "changes", "-s", "pending"], output, true)
+	
+	print("P4Client: _find_godot_changelist exit code: ", exit_code)
 	if exit_code == 0:
-		for line in output:
-			# Line format: "Change 12345 on 2023/12/01 by user@client 'Description'"
-			if GODOT_CHANGELIST_DESCRIPTION in line:
-				var parts = line.split(" ")
-				if parts.size() >= 2:
-					return parts[1] # Return the changelist number
+		print("P4Client: _find_godot_changelist output size: ", output.size())
+		
+		# Parse JSON Lines output
+		var json_text = ""
+		for chunk in output:
+			json_text += chunk
+		
+		var lines = json_text.split("\n")
+		var json = JSON.new()
+		
+		for line in lines:
+			line = line.strip_edges()
+			if line == "":
+				continue
+				
+			print("P4Client: Checking JSON line: ", line)
+			var parse_result = json.parse(line)
+			
+			if parse_result == OK:
+				var change_data = json.data
+				if change_data.has("change") and change_data.has("desc") and change_data.has("status"):
+					if change_data["status"] == "pending":
+						var description = change_data["desc"].strip_edges()
+						if GODOT_CHANGELIST_DESCRIPTION in description:
+							var cl_number = str(change_data["change"])
+							print("P4Client: Found existing Godot changelist: ", cl_number)
+							return cl_number
+	else:
+		print("P4Client: _find_godot_changelist failed with exit code: ", exit_code)
+		if output.size() > 0:
+			print("P4Client: Error output: ", output)
 	
+	print("P4Client: No existing Godot changelist found")
 	return ""
 
-func _get_current_user() -> String:
-	var output = []
-	var exit_code = OS.execute("p4", ["user", "-o"], output, true)
-	
-	if exit_code == 0:
-		for line in output:
-			if line.begins_with("User:"):
-				return line.split(":")[1].strip_edges()
-	
-	return ""
 
 func _is_changelist_valid(changelist_number: String) -> bool:
 	if changelist_number == "":

@@ -5,11 +5,13 @@ const PLUGIN_NAME = "Perforce Integration"
 
 const P4FileSystemContextMenuHandler = preload("res://addons/p4-tools/P4FileSystemContextMenuHandler.gd")
 const P4ContextMenuItem = preload("res://addons/p4-tools/P4ContextMenuItem.gd")
+const P4Tab = preload("res://addons/p4-tools/p4_tab.tscn")
 
 var file_system: EditorFileSystem
 var perforce_client: PerforceClient
 var pending_checkouts = []
 var _context_menu_handler
+var p4_tab_instance
 
 func _enter_tree():
 	file_system = EditorInterface.get_resource_filesystem()
@@ -40,12 +42,21 @@ func _enter_tree():
 	add_tool_menu_item("P4 Checkout Current File", _checkout_current_file)
 	add_tool_menu_item("P4 Show Checked Out Files", _show_checked_out_files)
 	
+	# Create and add P4 tab to dock
+	p4_tab_instance = P4Tab.instantiate()
+	p4_tab_instance.set_perforce_client(perforce_client)
+	add_control_to_dock(DOCK_SLOT_LEFT_BL, p4_tab_instance)
+	
 	add_file_system_dock_context_menu()
 
 func _exit_tree():
 	remove_tool_menu_item("P4 Checkout Current File")
 	remove_tool_menu_item("P4 Show Checked Out Files")
 	
+	# Remove P4 tab from dock
+	if p4_tab_instance:
+		remove_control_from_docks(p4_tab_instance)
+		p4_tab_instance.queue_free()
 	if _context_menu_handler:
 		remove_child(_context_menu_handler)
 		_context_menu_handler.free()
@@ -71,7 +82,7 @@ func add_file_system_dock_context_menu() -> void:
 		for file in selected_files:
 			perforce_client.checkout_file(file)
 
-	var menu :Array[P4ContextMenuItem] = [
+	var menu: Array[P4ContextMenuItem] = [
 		P4ContextMenuItem.new(P4ContextMenuItem.MENU_ID.CHECK_OUT, "P4 Checkout", "", func(_f): return true, is_enabled, checkout_files),
 	]
 	_context_menu_handler = P4FileSystemContextMenuHandler.new(menu)
@@ -144,6 +155,9 @@ func _on_file_checked_out(file_path: String, success: bool):
 		file_system.scan()
 		# Update file in editor if it's currently open
 		EditorInterface.reload_scene_from_path(file_path)
+		# Refresh the P4 tab to show the newly checked out file
+		if p4_tab_instance:
+			p4_tab_instance.refresh()
 	else:
 		push_error("P4: Failed to checkout " + file_path)
 
@@ -188,6 +202,10 @@ func _show_checked_out_files():
 	for file in files:
 		print("  ", file)
 	print("Total: ", files.size())
+	
+	# Also refresh the P4 tab if it exists
+	if p4_tab_instance:
+		p4_tab_instance.refresh()
 
 # Editor signal handlers
 func _on_filesystem_changed():
