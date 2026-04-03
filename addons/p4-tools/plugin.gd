@@ -45,7 +45,7 @@ func _enter_tree():
 	# Create and add P4 tab to dock
 	p4_tab_instance = P4Tab.instantiate()
 	p4_tab_instance.set_perforce_client(perforce_client)
-	add_control_to_dock(DOCK_SLOT_LEFT_BL, p4_tab_instance)
+	add_control_to_dock(DOCK_SLOT_LEFT_UR, p4_tab_instance)
 	
 	add_file_system_dock_context_menu()
 
