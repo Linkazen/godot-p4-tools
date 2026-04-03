@@ -552,7 +552,15 @@ func _create_changelist(description: String) -> String:
 	# Use shell to pipe the file into p4 change -i
 	var create_output = []
 	var shell_command = "p4 change -i < \"" + temp_file_path + "\""
-	var create_exit_code = OS.execute("cmd", ["/c", shell_command], create_output, true)
+	
+	var os_name := OS.get_name()
+	var create_exit_code : int
+	if os_name == "Windows":
+		create_exit_code = OS.execute("cmd", ["/c", shell_command], create_output, true)
+	elif os_name == "Linux":
+		create_exit_code = OS.execute("bash", ["/c", shell_command], create_output, true)
+	else:
+		print("Your OS is not supported to run p4 change. If you would like to ")
 	
 	# Clean up temp file
 	if FileAccess.file_exists(temp_file_path):

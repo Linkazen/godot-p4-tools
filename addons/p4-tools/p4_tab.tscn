@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://d3c3jh6fihtih"]
+[gd_scene format=3 uid="uid://d3c3jh6fihtih"]
 
 [ext_resource type="Script" uid="uid://bjcgm3rvlfgv" path="res://addons/p4-tools/p4_tab.gd" id="1_624gu"]
 
