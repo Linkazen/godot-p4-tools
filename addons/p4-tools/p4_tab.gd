@@ -124,8 +124,6 @@ func _populate_list_view(root: TreeItem, files: Array):
 func _populate_tree_view(root: TreeItem, files: Array):
 	var folders = {}
 	
-	print("Populating tree view...")
-	
 	# Group files by directory
 	for file_path in files:
 		var display_path = file_path
@@ -152,8 +150,6 @@ func _populate_tree_view(root: TreeItem, files: Array):
 func _create_tree_items(parent: TreeItem, folder_dict: Dictionary):
 	var sorted_keys = folder_dict.keys()
 	sorted_keys.sort()
-	
-	print("Creating tree item...")
 	
 	for key in sorted_keys:
 		var value = folder_dict[key]
