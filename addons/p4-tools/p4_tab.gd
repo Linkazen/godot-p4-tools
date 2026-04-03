@@ -123,7 +123,7 @@ func _populate_list_view(root: TreeItem, files: Array):
 
 func _populate_tree_view(root: TreeItem, files: Array):
 	var folders = {}
-	
+		
 	# Group files by directory
 	for file_path in files:
 		var display_path = file_path
@@ -410,6 +410,7 @@ func _populate_files_ui(cl_item: TreeItem, files: Array):
 		if icon:
 			file_item.set_icon(0, icon)
 
+
 # Allow external refresh calls
 func refresh():
 	_refresh_file_list()
@@ -426,6 +427,12 @@ func _on_changelist_item_popup_id_pressed(id: int) -> void:
 		0: # Revert file (if unchanged)
 			perforce_client.revert_file(tree.get_selected().get_metadata(0), true)
 			refresh()
+			pass
+		1: # Revert file
+			var scene_path : String = tree.get_selected().get_metadata(0)
+			perforce_client.revert_file(scene_path, false)
+			refresh()
+			EditorInterface.reload_scene_from_path(scene_path)
 			pass
 		_:
 			printerr("Invalid menu option")
