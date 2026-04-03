@@ -6,6 +6,7 @@ extends Control
 @onready var view_as_tree_button: Button = %ViewAsTreeButton
 @onready var tree: Tree = %Tree
 @onready var repository_label: RichTextLabel = %RichTextLabel
+@onready var changelist_item_popup : PopupMenu = %ChangelistItemPopup
 
 var perforce_client: PerforceClient
 var is_tree_view: bool = false
@@ -123,6 +124,8 @@ func _populate_list_view(root: TreeItem, files: Array):
 func _populate_tree_view(root: TreeItem, files: Array):
 	var folders = {}
 	
+	print("Populating tree view...")
+	
 	# Group files by directory
 	for file_path in files:
 		var display_path = file_path
@@ -149,6 +152,8 @@ func _populate_tree_view(root: TreeItem, files: Array):
 func _create_tree_items(parent: TreeItem, folder_dict: Dictionary):
 	var sorted_keys = folder_dict.keys()
 	sorted_keys.sort()
+	
+	print("Creating tree item...")
 	
 	for key in sorted_keys:
 		var value = folder_dict[key]
@@ -380,7 +385,7 @@ func _get_raw_changelist_files(cl_number: String) -> Array:
 
 func _populate_files_ui(cl_item: TreeItem, files: Array):
 	# Remove placeholder
-	var placeholder = cl_item.get_first_child()
+	var placeholder := cl_item.get_first_child()
 	if placeholder:
 		placeholder.free()
 	
@@ -412,3 +417,20 @@ func _populate_files_ui(cl_item: TreeItem, files: Array):
 # Allow external refresh calls
 func refresh():
 	_refresh_file_list()
+
+
+func _on_tree_item_mouse_selected(mouse_position: Vector2, mouse_button_index: int) -> void:
+	if mouse_button_index == MOUSE_BUTTON_RIGHT and tree.get_selected().get_parent() != tree.get_root():
+		tree.get_selected()
+		changelist_item_popup.popup(Rect2i(get_global_mouse_position(), Vector2i.ZERO))
+
+
+func _on_changelist_item_popup_id_pressed(id: int) -> void:
+	match id:
+		0: # Revert file (if unchanged)
+			perforce_client.revert_file(tree.get_selected().get_metadata(0), true)
+			refresh()
+			pass
+		_:
+			printerr("Invalid menu option")
+			pass
