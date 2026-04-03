@@ -165,19 +165,26 @@ func get_file_status(file_path: String) -> String:
 	else:
 		return "Unknown"
 
-func revert_file(file_path: String) -> bool:
+func revert_file(file_path: String, only_revert_if_unchanged : bool) -> bool:
 	var absolute_path = ProjectSettings.globalize_path(file_path)
 	
 	var output = []
-	var exit_code = OS.execute("p4", ["revert", absolute_path], output, true)
+	var exit_code : int
+	
+	if only_revert_if_unchanged:
+		exit_code = OS.execute("p4", ["revert", "-a", absolute_path], output, true)
+	else:
+		exit_code = OS.execute("p4", ["revert", absolute_path], output, true)
 	
 	if exit_code == 0:
 		checked_out_files.erase(file_path)
+		print("P4Client: Successfully reverted")
 		return true
 	else:
 		var error_msg = "Failed to revert " + file_path
 		if output.size() > 0:
 			error_msg += ": " + output[0]
+			printerr("P4Client: " + error_msg)
 		return false
 
 func cleanup_old_entries():
