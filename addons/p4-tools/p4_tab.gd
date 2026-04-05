@@ -422,6 +422,7 @@ func _on_tree_item_mouse_selected(mouse_position: Vector2, mouse_button_index: i
 		changelist_item_popup.popup(Rect2i(get_global_mouse_position(), Vector2i.ZERO))
 
 
+## Handles changelist file popup
 func _on_changelist_item_popup_id_pressed(id: int) -> void:
 	match id:
 		0: # Revert file (if unchanged)
@@ -433,6 +434,12 @@ func _on_changelist_item_popup_id_pressed(id: int) -> void:
 			perforce_client.revert_file(scene_path, false)
 			refresh()
 			EditorInterface.reload_scene_from_path(scene_path)
+			pass
+		2: # Lock file
+			print("P4Client: Lock file not implemented yet")
+			pass
+		3: # Unlock file
+			print("P4Client: Unlock file not implemented yet")
 			pass
 		_:
 			printerr("Invalid menu option")

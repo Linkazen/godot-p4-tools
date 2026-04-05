@@ -1,0 +1,88 @@
+[gd_scene format=3 uid="uid://d3c3jh6fihtih"]
+
+[ext_resource type="Script" uid="uid://bjcgm3rvlfgv" path="res://addons/p4-tools/p4_tab.gd" id="1_624gu"]
+
+[node name="P4Tab" type="Control" unique_id=1255693794]
+custom_minimum_size = Vector2(200, 500)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = -1220.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("1_624gu")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=359190714]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer" unique_id=470432081]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/MarginContainer" unique_id=884120604]
+layout_mode = 2
+
+[node name="RichTextLabel" type="RichTextLabel" parent="VBoxContainer/MarginContainer/HBoxContainer" unique_id=1472347497]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "P4 Client: Not Available"
+fit_content = true
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ViewAsTreeButton" type="Button" parent="VBoxContainer/MarginContainer/HBoxContainer" unique_id=592229550]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Tree"
+
+[node name="SyncButton" type="Button" parent="VBoxContainer/MarginContainer/HBoxContainer" unique_id=472735931]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Sync"
+
+[node name="RefreshButton" type="Button" parent="VBoxContainer/MarginContainer/HBoxContainer" unique_id=1783062921]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Refresh"
+
+[node name="Tree" type="Tree" parent="VBoxContainer" unique_id=820719430]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+columns = 2
+column_titles_visible = true
+allow_rmb_select = true
+hide_root = true
+
+[node name="ChangelistItemPopup" type="PopupMenu" parent="." unique_id=654446304]
+unique_name_in_owner = true
+oversampling_override = 1.0
+item_count = 5
+item_0/text = "Revert File"
+item_0/id = 1
+item_1/text = "Revert File if Unchanged"
+item_1/id = 0
+item_2/id = 4
+item_2/disabled = true
+item_2/separator = true
+item_3/text = "Lock"
+item_3/id = 2
+item_4/text = "Unlock"
+item_4/id = 3
+
+[connection signal="item_mouse_selected" from="VBoxContainer/Tree" to="." method="_on_tree_item_mouse_selected"]
+[connection signal="id_pressed" from="ChangelistItemPopup" to="." method="_on_changelist_item_popup_id_pressed"]
