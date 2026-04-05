@@ -582,14 +582,47 @@ func _create_changelist(description: String) -> String:
 	
 	return ""
 
+
+func lock_file(file_path: String) -> bool:
+	var output := []
+	var exit_code := OS.execute("p4", ["lock", ProjectSettings.globalize_path(file_path)])
+
+	if exit_code != 0:
+		## TODO: Print more error info here
+		print("P4Client: Failed to lock file")
+	
+	return exit_code == 0
+
+
+func unlock_file(file_path: String) -> bool:
+	var output := []
+	var exit_code := OS.execute("p4", ["unlock", ProjectSettings.globalize_path(file_path)])
+
+	if exit_code != 0:
+		## TODO: Print more error info here
+		print("P4Client: Failed to unlock file")
+	
+	return exit_code == 0
+
+
+func is_file_locked(file_path: String) -> bool:
+	var output := []
+	var exit_code := OS.execute("p4", ["opened", "-a", file_path], output, true)
+	
+	if output.size() > 0:
+		return (output[0] as String).contains("*locked*")
+	else:
+		return false
+
+
 func _move_file_to_changelist(file_path: String, changelist_number: String) -> bool:
 	if changelist_number == "":
 		return false
 	
-	var absolute_path = ProjectSettings.globalize_path(file_path)
+	var absolute_path := ProjectSettings.globalize_path(file_path)
 	
-	var output = []
-	var exit_code = OS.execute("p4", ["reopen", "-c", changelist_number, absolute_path], output, true)
+	var output := []
+	var exit_code := OS.execute("p4", ["reopen", "-c", changelist_number, absolute_path], output, true)
 	
 	# If the changelist doesn't exist anymore, recreate it
 	if exit_code != 0 and output.size() > 0:
@@ -603,3 +636,5 @@ func _move_file_to_changelist(file_path: String, changelist_number: String) -> b
 				exit_code = OS.execute("p4", ["reopen", "-c", godot_changelist_number, absolute_path], output, true)
 	
 	return exit_code == 0
+
+

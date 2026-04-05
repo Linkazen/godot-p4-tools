@@ -11,8 +11,15 @@ extends Control
 var perforce_client: PerforceClient
 var is_tree_view: bool = false
 
+
 func set_perforce_client(client: PerforceClient):
 	perforce_client = client
+	P4Item.p4 = client
+	
+	## DEBUG
+	P4Item.new("res://Scenes/Menus/main_menu.tscn")
+	## DEBUG
+	
 	if is_inside_tree():
 		_update_repository_info()
 		_refresh_file_list()
@@ -178,6 +185,7 @@ func _create_tree_items(parent: TreeItem, folder_dict: Dictionary):
 			var icon = _get_file_icon(value)
 			if icon:
 				item.set_icon(0, icon)
+
 
 func _get_file_icon(file_path: String) -> Texture2D:
 	var extension = file_path.get_extension().to_lower()
